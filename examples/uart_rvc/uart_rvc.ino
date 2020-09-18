@@ -1,98 +1,58 @@
-#define mySerial Serial1
+/* Test sketch for Adafruit BNO08x sensor in UART-RVC mode */
 
-#define MILLI_G_TO_MS2 0.0098067
-#define DEGREE_SCALE 0.01
-#define BUFFER_SIZE 64
-int16_t raw_accel_x, raw_accel_y, raw_accel_z, raw_yaw, raw_roll,
-    raw_pitch;               
-uint8_t buffer[BUFFER_SIZE];
-float yaw, pitch, roll, x_accel, y_accel, z_accel;
+#include "Adafruit_BNO08x_RVC.h"
+
+Adafruit_BNO08x_RVC rvc = Adafruit_BNO08x_RVC();
+
 void setup() {
-  // Open serial communications and wait for port to open:
+  // Wait for serial monitor to open
   Serial.begin(115200);
-  while (!Serial) {
-    delay(
-        10); // wait for serial port to connect. Needed for native USB port only
+  while (!Serial)
+    delay(10);
+
+  Serial.println("Adafruit BNO08x IMU - UART-RVC mode");
+
+  Serial1.begin(115200); // This is the baud rate specified by the datasheet
+  while (!Serial1)
+    delay(10);
+
+  if (!rvc.begin(&Serial1)) { // connect to the sensor over hardware serial
+    Serial.println("Could not find BNO08x!");
+    while (1)
+      delay(10);
   }
 
-//  Serial.println("Adafruit BNO08x UART-RVC Test");
-
-  // set the data rate for the Serial port, 9600 for the sensor
-  mySerial.begin(115200);
+  Serial.println("BNO08x found!");
 }
 
-void loop() { // run over and over
-  uint8_t available = mySerial.available();
-  if (available < 2) {
+void loop() {
+  BNO08x_RVC_Data heading;
+
+  if (!rvc.read(&heading)) {
     return;
   }
-  buffer[0] = mySerial.read();
 
-  if (buffer[0] == 0xAA) {
-    buffer[1] = mySerial.read();
+  Serial.println();
+  Serial.println(F("---------------------------------------"));
+  Serial.println(F("Principal Axes:"));
+  Serial.println(F("---------------------------------------"));
+  Serial.print(F("Yaw: "));
+  Serial.print(heading.yaw);
+  Serial.print(F("\tPitch: "));
+  Serial.print(heading.pitch);
+  Serial.print(F("\tRoll: "));
+  Serial.println(heading.roll);
+  Serial.println(F("---------------------------------------"));
+  Serial.println(F("Acceleration"));
+  Serial.println(F("---------------------------------------"));
+  Serial.print(F("X: "));
+  Serial.print(heading.x_accel);
+  Serial.print(F("\tY: "));
+  Serial.print(heading.y_accel);
+  Serial.print(F("\tZ: "));
+  Serial.println(heading.z_accel);
+  Serial.println(F("---------------------------------------"));
 
-    if (buffer[1] == 0xAA) {
-      if (parseFrame()) {
-        printFrame();
-      }
-    }
-  }
-}
 
-bool parseFrame() {
-  uint8_t crc_calc = 0;
-  uint8_t c;
-  // read the next 17 bytes
-  for (int i = 0; i < 17; i++) {
-    while (!mySerial.available()) {
-      delay(1);
-    }
-    buffer[i] = mySerial.read();
-    if (i < 16) {
-      crc_calc += buffer[i];
-    }
-  }
-
-  // verify CRC
-  if (crc_calc != buffer[16]) {
-    Serial.println("********** BAD CRC ************");
-    return false;
-  }
-
-  raw_accel_x = ((buffer[2] << 8) | buffer[1]);
-  raw_accel_y = ((buffer[4] << 8) | buffer[3]);
-  raw_accel_z = ((buffer[6] << 8) | buffer[5]);
-  raw_yaw = ((buffer[8] << 8) | buffer[7]);
-  raw_roll = ((buffer[10] << 8) | buffer[9]);
-  raw_pitch = ((buffer[12] << 8) | buffer[11]);
-
-  yaw = (float)raw_accel_x * DEGREE_SCALE;
-  pitch = (float)raw_accel_y * DEGREE_SCALE;
-  roll = (float)raw_accel_z * DEGREE_SCALE;
-  x_accel = (float)raw_yaw * MILLI_G_TO_MS2;
-  y_accel = (float)raw_roll * MILLI_G_TO_MS2;
-  z_accel = (float)raw_pitch * MILLI_G_TO_MS2;
-  // 13,14, 15=reserved, 16=
-  return true;
-}
-
-void printFrame() {
-  Serial.print("Yaw:");
-  Serial.print(yaw);
-  Serial.print(", Pitch:");
-  Serial.print(pitch);
-  Serial.print(", Roll: ");
-  Serial.print(roll);
-//  Serial.println(" degrees");
-
-//  Serial.print("Acceleration:");
-  Serial.print(", X:");
-  Serial.print(x_accel);
-  Serial.print(", Y:");
-  Serial.print(y_accel);
-  Serial.print(", Z:");
-  Serial.print(z_accel);
-
-//  Serial.println(" m/s^2");
-  Serial.println("");
+  //  delay(200);
 }
